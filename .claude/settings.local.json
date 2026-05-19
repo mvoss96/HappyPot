@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Read(//c/ncs/v3.3.0/zephyr/drivers/display/***)",
+      "Bash(wc -l C:/ncs/v3.3.0/zephyr/include/zephyr/display/ssd16xx.h C:/ncs/v3.3.0/zephyr/drivers/display/ssd16xx_regs.h)",
+      "Read(//c/ncs/v3.3.0/zephyr/include/zephyr/display/***)"
+    ]
+  }
+}

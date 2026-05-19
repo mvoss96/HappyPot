@@ -1,0 +1,16 @@
+{
+    "configurations": [
+        {
+            "name": "nRF Connect SDK",
+            "compileCommands": "${workspaceFolder}/build/HappyPot/compile_commands.json",
+            "compilerPath": "C:/ncs/toolchains/936afb6332/opt/zephyr-sdk/arm-zephyr-eabi/bin/arm-zephyr-eabi-g++.exe",
+            "forcedInclude": [
+                "${workspaceFolder}/build/HappyPot/zephyr/include/generated/zephyr/autoconf.h"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "windows-gcc-arm"
+        }
+    ],
+    "version": 4
+}

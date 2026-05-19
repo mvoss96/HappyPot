@@ -1,0 +1,112 @@
+/**
+ * Overlay für WeAct Studio 1.54" 200x200 E-Paper (SSD1681)
+ * angeschlossen an SPI2 des ProMicro nRF52840.
+ *
+ * Pinbelegung (bewährt aus früherem Arduino-Setup):
+ *   SCK=P1.11  MOSI=P1.13  CS=P0.10  DC=P0.09  RST=P0.29
+ *   BUSY=P0.02  POWER_EN=P0.13
+ *
+ * P0.09/P0.10 sind im Board-File UART0 -> UART0 wird deaktiviert.
+ *
+ * Zusätzlich: Capacitive Soil Moisture Sensor v2.0
+ *   AOUT=P0.31 (AIN7), VCC=3V3, GND=GND
+ */
+
+#include <zephyr/dt-bindings/adc/adc.h>
+#include <zephyr/dt-bindings/adc/nrf-adc.h>
+
+/** UART0 deaktivieren, damit P0.09/P0.10 fürs Display frei sind */
+&uart0 {
+	status = "disabled";
+};
+
+&spi2_default {
+	group1 {
+		psels = <NRF_PSEL(SPIM_SCK, 1, 11)>,
+			<NRF_PSEL(SPIM_MOSI, 1, 13)>;
+	};
+};
+
+&spi2_sleep {
+	group1 {
+		psels = <NRF_PSEL(SPIM_SCK, 1, 11)>,
+			<NRF_PSEL(SPIM_MOSI, 1, 13)>;
+		low-power-enable;
+	};
+};
+
+&spi2 {
+	cs-gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
+};
+
+/ {
+	/**
+	 * Externer 3V3-LDO/Load-Switch wird per GPIO P0.13 (Aktiv-HIGH) freigegeben.
+	 * Mit "regulator-boot-on" schaltet Zephyr den Regler automatisch beim Boot
+	 * ein, bevor der Display-Treiber initialisiert wird.
+	 */
+	ext_3v3: ext-3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "ext-3v3";
+		enable-gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
+		regulator-boot-on;
+		startup-delay-us = <10000>;
+	};
+
+	chosen {
+		zephyr,display = &epaper;
+	};
+
+	mipi_dbi_epaper {
+		compatible = "zephyr,mipi-dbi-spi";
+		spi-dev = <&spi2>;
+		dc-gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		epaper: ssd1681@0 {
+			compatible = "solomon,ssd1681";
+			mipi-max-frequency = <1000000>;
+			reg = <0>;
+			width = <200>;
+			height = <200>;
+			busy-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+			tssv = <0x80>;
+
+			/**
+			 * Leere Profile -> Treiber nutzt die Waveform-Defaults
+			 * aus dem OTP-Speicher des Panels (wie GxEPD2_154_D67).
+			 * Damit bleibt der VBD-Rand (Register 0x3C) auf Default
+			 * statt schwarz.
+			 */
+			full {
+			};
+
+			partial {
+			};
+		};
+	};
+
+	zephyr,user {
+		io-channels = <&adc 0>;
+		/** Soil sensor VCC is fed directly from P0.17 so it is only
+		 * powered while sampling (~5 mA otherwise continuous). */
+		soil-power-gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&adc {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@0 {
+		reg = <0>;
+		zephyr,gain = "ADC_GAIN_1_5";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 10)>;
+		zephyr,input-positive = <NRF_SAADC_AIN7>;
+		zephyr,resolution = <12>;
+	};
+};
