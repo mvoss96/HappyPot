@@ -2,6 +2,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/pm/device.h>
 
 LOG_MODULE_REGISTER(soil, LOG_LEVEL_INF);
 
@@ -55,6 +56,11 @@ int SoilSensor::read_raw_mv(int32_t *mv_out)
 	// let the 555 timer settle and output a stable reading
 	k_msleep(k_settle_ms);
 
+	/** SAADC stays armed after a read unless we explicitly suspend it
+	 * (~1.2 mA idle on nRF52840). Resume just for the sample, suspend
+	 * straight after. -EALREADY is fine on either action. */
+	pm_device_action_run(m_adc.dev, PM_DEVICE_ACTION_RESUME);
+
 	int16_t raw = 0;
 	adc_sequence seq{
 		.buffer = &raw,
@@ -63,6 +69,8 @@ int SoilSensor::read_raw_mv(int32_t *mv_out)
 	err = adc_sequence_init_dt(&m_adc, &seq);
 	if (err == 0)
 		err = adc_read(m_adc.dev, &seq);
+
+	pm_device_action_run(m_adc.dev, PM_DEVICE_ACTION_SUSPEND);
 
 	// power off the probe to save energy and prevent corrosion
 	gpio_pin_set_dt(&m_pwr, 0);

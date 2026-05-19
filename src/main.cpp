@@ -50,8 +50,8 @@ int main()
 		return 0;
 	}
 
-	/** Render something immediately rather than wait a full interval. */
-	sample_and_publish();
-	k_work_schedule(&measurement_work, cfg::MEASUREMENT_INTERVAL);
+	/** Let the boot splash finish rendering (~3 s for a full SSD1681
+	 * refresh) before the first sample replaces it. */
+	k_work_schedule(&measurement_work, K_SECONDS(4));
 	return 0;
 }
