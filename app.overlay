@@ -14,6 +14,7 @@
 
 #include <zephyr/dt-bindings/adc/adc.h>
 #include <zephyr/dt-bindings/adc/nrf-adc.h>
+#include <zephyr/dt-bindings/regulator/nrf5x.h>
 
 /** UART0 deaktivieren, damit P0.09/P0.10 fürs Display frei sind */
 &uart0 {
@@ -37,6 +38,16 @@
 
 &spi2 {
 	cs-gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
+};
+
+/**
+ * nRF52840 Haupt-Regler REG1 in den DC/DC-Buck-Modus statt LDO. Spart vor allem
+ * Strom bei aktiver CPU/Funk (Refresh, BLE-TX). Setzt voraus, dass die DCC-
+ * Induktivität auf dem Board bestückt ist (bei ProMicro/nice!nano i.d.R. ja).
+ * Falls nicht -> Brownout/Reset -> diese Override wieder entfernen.
+ */
+&reg1 {
+	regulator-initial-mode = <NRF5X_REG_MODE_DCDC>;
 };
 
 / {
