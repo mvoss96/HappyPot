@@ -15,24 +15,22 @@ namespace
 
 	bt_le_ext_adv *adv = nullptr;
 	uint8_t packet_counter = 0;
-	bool advertising = false;
 
 	const uint8_t flags = BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR;
 
-	/** Advertising interval in 0.625 ms units. 16000 = 10 s, matching the
-	 * measurement cadence (legacy adv max is 10.24 s). */
-	constexpr uint16_t ADV_INTERVAL = 16000;
+	/** Advertising interval in 0.625 ms units. Only matters for the spacing
+	 * within a multi-event burst; with num_events=1 a single event goes out. */
+	constexpr uint16_t ADV_INTERVAL = 160;
 
 	constexpr uint32_t FW_VERSION =
 		(static_cast<uint32_t>(cfg::FW_VERSION_MAJOR) << 16) |
 		(static_cast<uint32_t>(cfg::FW_VERSION_MINOR) << 8) |
 		cfg::FW_VERSION_PATCH;
 
-	/** Push the payload to the controller, then (first call only) kick off
-	 * continuous advertising. bt_le_ext_adv_set_data hands the new data to the
-	 * controller without holding the SoC awake until the next event — unlike
-	 * legacy bt_le_adv_update_data, which stalls for ~one interval. */
-	int set_and_advertise(const bt_data *ad, size_t n)
+	/** Set the payload and emit exactly one advertising event (1 TX per primary
+	 * channel), then the controller auto-stops. ext-adv set_data is non-blocking
+	 * so the SoC sleeps right after the event. */
+	int advertise_once(const bt_data *ad, size_t n)
 	{
 		int err = bt_le_ext_adv_set_data(adv, ad, n, nullptr, 0);
 		if (err)
@@ -40,21 +38,16 @@ namespace
 			LOG_WRN("ext_adv_set_data failed (%d)", err);
 			return err;
 		}
-		if (!advertising)
+		const bt_le_ext_adv_start_param start_param = {
+			.timeout = 0,
+			.num_events = 1,
+		};
+		err = bt_le_ext_adv_start(adv, &start_param);
+		if (err)
 		{
-			const bt_le_ext_adv_start_param start_param = {
-				.timeout = 0,    // no timeout
-				.num_events = 0, // continuous
-			};
-			err = bt_le_ext_adv_start(adv, &start_param);
-			if (err)
-			{
-				LOG_WRN("ext_adv_start failed (%d)", err);
-				return err;
-			}
-			advertising = true;
+			LOG_WRN("ext_adv_start failed (%d)", err);
 		}
-		return 0;
+		return err;
 	}
 
 } // namespace
@@ -122,9 +115,9 @@ int bthome_publish(int32_t mv, int percent)
 			svc,
 			BT_DATA(BT_DATA_NAME_COMPLETE, name, static_cast<uint8_t>(strlen(name))),
 		};
-		return set_and_advertise(ad, ARRAY_SIZE(ad));
+		return advertise_once(ad, ARRAY_SIZE(ad));
 	}
 
 	const bt_data ad[] = {flags_ad, svc};
-	return set_and_advertise(ad, ARRAY_SIZE(ad));
+	return advertise_once(ad, ARRAY_SIZE(ad));
 }
