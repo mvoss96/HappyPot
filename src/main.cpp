@@ -2,6 +2,7 @@
 #include <zephyr/logging/log.h>
 
 #include "app_config.h"
+#include "bthome_adv.h"
 #include "display_ui.h"
 #include "soil.h"
 
@@ -27,6 +28,7 @@ namespace
 		}
 		LOG_INF("reading %4d mV  ~%3d %%", reading.mv, reading.percent);
 		ui_show_reading(reading.mv, reading.percent);
+		bthome_publish(reading.mv, reading.percent);
 	}
 
 	void measurement_cycle(struct k_work *)
@@ -47,6 +49,11 @@ int main()
 	if (ui_init() < 0)
 	{
 		LOG_ERR("ui init failed");
+		return 0;
+	}
+	if (bthome_init() < 0)
+	{
+		LOG_ERR("bthome init failed");
 		return 0;
 	}
 

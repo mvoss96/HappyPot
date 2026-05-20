@@ -13,6 +13,7 @@ target_sources(app PRIVATE
 	src/main.cpp
 	src/display_ui.cpp
 	src/soil.cpp
+	src/bthome_adv.cpp
 	# Vendored SSD16XX display driver with PM support.
 	# See src/drivers/README.md. Paired with CONFIG_SSD16XX=n.
 	src/drivers/ssd16xx.c
@@ -25,3 +26,6 @@ target_sources(app PRIVATE
 	src/ui_images/s1_meh.c
 	src/ui_images/s1_thirsty.c
 )
+
+# Header-only BTHome v2 payload builder (git submodule).
+target_include_directories(app PRIVATE lib/bthome-cpp/src)

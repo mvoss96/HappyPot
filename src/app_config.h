@@ -19,4 +19,9 @@ constexpr int32_t SOIL_MV_WET = 1500;
 constexpr int MOOD_HAPPY_PCT = 60;
 constexpr int MOOD_MEH_PCT = 30;
 
+/** Firmware version, broadcast via BTHome (obj 0xF2, shown as MAJOR.MINOR.PATCH). */
+constexpr uint8_t FW_VERSION_MAJOR = 0;
+constexpr uint8_t FW_VERSION_MINOR = 1;
+constexpr uint8_t FW_VERSION_PATCH = 0;
+
 }  // namespace cfg
