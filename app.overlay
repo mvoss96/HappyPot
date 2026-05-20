@@ -43,7 +43,9 @@
 	/**
 	 * Externer 3V3-LDO/Load-Switch wird per GPIO P0.13 (Aktiv-HIGH) freigegeben.
 	 * Mit "regulator-boot-on" schaltet Zephyr den Regler automatisch beim Boot
-	 * ein, bevor der Display-Treiber initialisiert wird.
+	 * ein, bevor der Display-Treiber initialisiert wird. Die Schiene bleibt an,
+	 * der Controller schläft zwischen Refreshes per Deep-Sleep-Mode 1 (RAM bleibt
+	 * erhalten -> Partial-Refresh möglich), siehe display_ui.cpp.
 	 */
 	ext_3v3: ext-3v3 {
 		compatible = "regulator-fixed";
@@ -57,7 +59,7 @@
 		zephyr,display = &epaper;
 	};
 
-	mipi_dbi: mipi_dbi_epaper {
+	mipi_dbi_epaper {
 		compatible = "zephyr,mipi-dbi-spi";
 		spi-dev = <&spi2>;
 		dc-gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
@@ -75,19 +77,19 @@
 			tssv = <0x80>;
 
 			/**
-			 * Leeres full-Profil -> Treiber nutzt die Waveform-
-			 * Defaults aus dem OTP-Speicher des Panels (wie
-			 * GxEPD2_154_D67). Damit bleibt der VBD-Rand (Register
-			 * 0x3C) auf Default statt schwarz.
+			 * Leere Profile -> Treiber nutzt die Waveform-Defaults
+			 * aus dem OTP-Speicher des Panels (wie GxEPD2_154_D67).
+			 * Damit bleibt der VBD-Rand (Register 0x3C) auf Default
+			 * statt schwarz.
 			 *
-			 * KEIN partial-Profil: Wir schalten die 3V3-Schiene
-			 * zwischen den Refreshes komplett ab (display_ui.cpp),
-			 * also verliert der Controller den alten Frame. Partial-
-			 * Refresh braucht aber genau diesen alten Frame -> ohne
-			 * partial-Knoten erzwingt der Treiber jedes Mal einen
-			 * vollen, in sich abgeschlossenen Full-Refresh.
+			 * partial-Knoten ist wieder da: Die Schiene bleibt immer
+			 * an (siehe ext_3v3), der Controller behält seinen alten
+			 * Frame -> Partial-Refresh (schnell, kein Flash) möglich.
 			 */
 			full {
+			};
+
+			partial {
 			};
 		};
 	};
