@@ -1,0 +1,3 @@
+[submodule "lib/bthome-cpp"]
+	path = lib/bthome-cpp
+	url = https://github.com/mvoss96/bthome-cpp
