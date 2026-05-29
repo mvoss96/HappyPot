@@ -18,6 +18,7 @@ namespace
 
 	lv_obj_t *icon;
 	lv_obj_t *pct_label;
+	lv_obj_t *boot_meta_label;
 
 	unsigned design = 1;
 	int last_shown_percent = -1;
@@ -75,6 +76,26 @@ int ui_init()
 	lv_image_set_src(icon, &boot);  // Splash until the first reading lands.
 	lv_obj_align(icon, LV_ALIGN_CENTER, 0, 0);
 
+	boot_meta_label = lv_label_create(scr);
+	lv_obj_set_style_text_font(boot_meta_label, &lv_font_montserrat_16, 0);
+	lv_obj_set_style_text_color(boot_meta_label, lv_color_black(), 0);
+	lv_obj_set_style_text_opa(boot_meta_label, LV_OPA_70, 0);
+	lv_obj_set_style_text_align(boot_meta_label, LV_TEXT_ALIGN_CENTER, 0);
+	lv_obj_set_style_bg_color(boot_meta_label, lv_color_white(), 0);
+	lv_obj_set_style_bg_opa(boot_meta_label, LV_OPA_COVER, 0);
+	lv_obj_set_style_pad_hor(boot_meta_label, 6, 0);
+	lv_obj_set_style_pad_ver(boot_meta_label, 2, 0);
+	lv_obj_set_width(boot_meta_label, lv_pct(100));
+	char boot_meta[64];
+	snprintf(boot_meta,
+			 sizeof(boot_meta),
+			 "v%u.%u.%u",
+			 cfg::FW_VERSION_MAJOR,
+			 cfg::FW_VERSION_MINOR,
+			 cfg::FW_VERSION_PATCH);
+	lv_label_set_text(boot_meta_label, boot_meta);
+	lv_obj_align(boot_meta_label, LV_ALIGN_BOTTOM_MID, 0, -2);
+
 	pct_label = lv_label_create(scr);
 	lv_obj_set_style_text_font(pct_label, &lv_font_montserrat_40, 0);
 	lv_obj_set_style_text_color(pct_label, lv_color_black(), 0);
@@ -116,6 +137,7 @@ int ui_show_reading(int32_t /*mv*/, int percent)
 		lv_image_set_src(icon, want_icon);
 		last_icon_src = want_icon;
 	}
+	lv_obj_add_flag(boot_meta_label, LV_OBJ_FLAG_HIDDEN);
 	lv_label_set_text(pct_label, pct);
 	lv_obj_clear_flag(pct_label, LV_OBJ_FLAG_HIDDEN);  // reveal after first reading
 
