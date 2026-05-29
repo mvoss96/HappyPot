@@ -19,10 +19,13 @@ namespace
 	lv_obj_t *icon;
 	lv_obj_t *pct_label;
 	lv_obj_t *boot_meta_label;
+	lv_obj_t *low_batt_icon;
 
 	unsigned design = 1;
 	int last_shown_percent = -1;
+	int last_battery_percent = -1;
 	const lv_image_dsc_t *last_icon_src = nullptr;
+	bool low_batt_visible = false;
 
 	/** [design][mood] -> image. Mood order: 0=thirsty, 1=meh, 2=happy. */
 	const lv_image_dsc_t *const icon_table[2][3] = {
@@ -107,6 +110,11 @@ int ui_init()
 	lv_obj_align(pct_label, LV_ALIGN_BOTTOM_MID, 0, -4);
 	lv_obj_add_flag(pct_label, LV_OBJ_FLAG_HIDDEN);  // hidden until first reading
 
+	low_batt_icon = lv_image_create(scr);
+	lv_image_set_src(low_batt_icon, &lowbat);
+	lv_obj_align(low_batt_icon, LV_ALIGN_CENTER, 0, 0);
+	lv_obj_add_flag(low_batt_icon, LV_OBJ_FLAG_HIDDEN);
+
 	display_blanking_off(display);
 
 	/** Hook the panel's deep-sleep onto LVGL's render lifecycle so it is only
@@ -124,7 +132,7 @@ int ui_show_reading(int32_t /*mv*/, int percent)
 {
 	const lv_image_dsc_t *want_icon = icon_for_percent(percent);
 
-	if (percent == last_shown_percent && want_icon == last_icon_src)
+	if (!low_batt_visible && percent == last_shown_percent && want_icon == last_icon_src)
 	{
 		return 0;
 	}
@@ -137,7 +145,9 @@ int ui_show_reading(int32_t /*mv*/, int percent)
 		lv_image_set_src(icon, want_icon);
 		last_icon_src = want_icon;
 	}
+	lv_obj_clear_flag(icon, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(boot_meta_label, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(low_batt_icon, LV_OBJ_FLAG_HIDDEN);
 	lv_label_set_text(pct_label, pct);
 	lv_obj_clear_flag(pct_label, LV_OBJ_FLAG_HIDDEN);  // reveal after first reading
 
@@ -145,6 +155,35 @@ int ui_show_reading(int32_t /*mv*/, int percent)
 	 * panel and put it back to deep sleep around this flush. */
 	lv_refr_now(lv_display_get_default());
 
+	low_batt_visible = false;
 	last_shown_percent = percent;
+	return 0;
+}
+
+int ui_show_low_battery(int battery_percent)
+{
+	if (battery_percent < 0)
+	{
+		battery_percent = 0;
+	}
+	if (battery_percent > 100)
+	{
+		battery_percent = 100;
+	}
+
+	if (low_batt_visible && battery_percent == last_battery_percent)
+	{
+		return 0;
+	}
+
+	lv_obj_add_flag(icon, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(pct_label, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(boot_meta_label, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_clear_flag(low_batt_icon, LV_OBJ_FLAG_HIDDEN);
+
+	lv_refr_now(lv_display_get_default());
+
+	low_batt_visible = true;
+	last_battery_percent = battery_percent;
 	return 0;
 }

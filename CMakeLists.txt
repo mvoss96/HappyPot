@@ -20,6 +20,7 @@ target_sources(app PRIVATE
 	src/drivers/ssd16xx.c
 	# Generated 1-bit LVGL image arrays. Regenerate with tools/svg_to_lvgl.py.
 	src/ui_images/boot.c
+	src/ui_images/lowbat.c
 	src/ui_images/s0_happy.c
 	src/ui_images/s0_meh.c
 	src/ui_images/s0_thirsty.c

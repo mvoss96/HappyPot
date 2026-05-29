@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 LV_IMAGE_DECLARE(boot);
+LV_IMAGE_DECLARE(lowbat);
 LV_IMAGE_DECLARE(s0_happy);
 LV_IMAGE_DECLARE(s0_meh);
 LV_IMAGE_DECLARE(s0_thirsty);

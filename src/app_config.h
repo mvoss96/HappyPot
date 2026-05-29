@@ -2,33 +2,36 @@
 
 #include <zephyr/kernel.h>
 
-namespace cfg {
+namespace cfg
+{
+    /** Measurement interval. */
+    constexpr k_timeout_t MEASUREMENT_INTERVAL = K_SECONDS(10);
 
-/** Measurement interval. */
-constexpr k_timeout_t MEASUREMENT_INTERVAL = K_SECONDS(10);
+    /** Rolling-average window. Smoothing horizon = WINDOW_SIZE * MEASUREMENT_INTERVAL. */
+    constexpr int WINDOW_SIZE = 10;
 
-/** Rolling-average window. Smoothing horizon = WINDOW_SIZE * MEASUREMENT_INTERVAL. */
-constexpr int WINDOW_SIZE = 10;
+    /** Capacitive soil probe calibration: measure DRY in air, WET submerged. */
+    constexpr int32_t SOIL_MV_DRY = 2000;
+    constexpr int32_t SOIL_MV_WET = 1500;
 
-/** Capacitive soil probe calibration: measure DRY in air, WET submerged. */
-constexpr int32_t SOIL_MV_DRY = 2000;
-constexpr int32_t SOIL_MV_WET = 1500;
+    /** Battery smoothing over the last N samples. */
+    constexpr int BATTERY_WINDOW_SIZE = 6;
 
-/** Battery smoothing over the last N samples. */
-constexpr int BATTERY_WINDOW_SIZE = 6;
+    /** Li-Ion voltage clamp for percentage mapping. */
+    constexpr int32_t BATTERY_MV_EMPTY = 3500;
+    constexpr int32_t BATTERY_MV_FULL = 4100;
 
-/** Li-Ion voltage clamp for percentage mapping. */
-constexpr int32_t BATTERY_MV_EMPTY = 3300;
-constexpr int32_t BATTERY_MV_FULL = 4200;
+    /** Show dedicated low-battery warning screen at or below this percentage. */
+    constexpr int LOW_BATTERY_PCT = 5;
 
-/** Mood thresholds. percent >= HAPPY_PCT -> happy; >= MEH_PCT -> meh;
- * below -> thirsty. */
-constexpr int MOOD_HAPPY_PCT = 60;
-constexpr int MOOD_MEH_PCT = 30;
+    /** Mood thresholds. percent >= HAPPY_PCT -> happy; >= MEH_PCT -> meh;
+     * below -> thirsty. */
+    constexpr int MOOD_HAPPY_PCT = 60;
+    constexpr int MOOD_MEH_PCT = 30;
 
-/** Firmware version, broadcast via BTHome (obj 0xF2, shown as MAJOR.MINOR.PATCH). */
-constexpr uint8_t FW_VERSION_MAJOR = 0;
-constexpr uint8_t FW_VERSION_MINOR = 1;
-constexpr uint8_t FW_VERSION_PATCH = 0;
+    /** Firmware version, broadcast via BTHome (obj 0xF2, shown as MAJOR.MINOR.PATCH). */
+    constexpr uint8_t FW_VERSION_MAJOR = 0;
+    constexpr uint8_t FW_VERSION_MINOR = 1;
+    constexpr uint8_t FW_VERSION_PATCH = 1;
 
-}  // namespace cfg
+} // namespace cfg
