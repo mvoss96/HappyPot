@@ -13,7 +13,7 @@
  */
 
 #include <zephyr/dt-bindings/adc/adc.h>
-#include <zephyr/dt-bindings/adc/nrf-adc.h>
+#include <zephyr/dt-bindings/adc/nrf-saadc.h>
 #include <zephyr/dt-bindings/regulator/nrf5x.h>
 
 /** UART0 deaktivieren, damit P0.09/P0.10 fürs Display frei sind */
@@ -119,7 +119,7 @@
 	};
 
 	zephyr,user {
-		io-channels = <&adc 0>;
+		io-channels = <&adc 0>, <&adc 1>;
 		/** Soil sensor VCC is fed directly from P0.17 so it is only
 		 * powered while sampling (~5 mA otherwise continuous). */
 		soil-power-gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
@@ -137,6 +137,16 @@
 		zephyr,reference = "ADC_REF_INTERNAL";
 		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 10)>;
 		zephyr,input-positive = <NRF_SAADC_AIN7>;
+		zephyr,resolution = <12>;
+	};
+
+	channel@1 {
+		reg = <1>;
+		zephyr,gain = "ADC_GAIN_1_6";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 10)>;
+		/* Measure raw battery rail through SAADC's internal VDDH/5 path. */
+		zephyr,input-positive = <NRF_SAADC_VDDHDIV5>;
 		zephyr,resolution = <12>;
 	};
 };

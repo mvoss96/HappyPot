@@ -4,6 +4,7 @@
 #include <zephyr/logging/log.h>
 
 #include "app_config.h"
+#include "battery.h"
 #include "bthome_adv.h"
 #include "display_ui.h"
 #include "soil.h"
@@ -13,10 +14,12 @@ LOG_MODULE_REGISTER(app, LOG_LEVEL_INF);
 namespace
 {
 	const adc_dt_spec soil0_adc = ADC_DT_SPEC_GET(DT_PATH(zephyr_user));
+	const adc_dt_spec battery_adc = ADC_DT_SPEC_GET_BY_IDX(DT_PATH(zephyr_user), 1);
 	const gpio_dt_spec soil0_pwr = GPIO_DT_SPEC_GET(DT_PATH(zephyr_user), soil_power_gpios);
 	const struct device *const log_uart = DEVICE_DT_GET(DT_NODELABEL(uart1));
 	
 	SoilSensor soil(soil0_adc, soil0_pwr, cfg::SOIL_MV_DRY, cfg::SOIL_MV_WET);
+	BatteryMonitor battery(battery_adc);
 
 	void set_log_uart_sleep(bool sleep)
 	{
@@ -33,15 +36,27 @@ namespace
 
 	void sample_and_publish()
 	{
-		SoilReading reading;
-		if (auto err = soil.sample(&reading); err < 0)
+		SoilReading soil_reading;
+		if (auto err = soil.sample(&soil_reading); err < 0)
 		{
 			LOG_ERR("soil sample failed (%d)", err);
 			return;
 		}
-		LOG_INF("reading %4d mV  ~%3d %%", reading.mv, reading.percent);
-		ui_show_reading(reading.mv, reading.percent);
-		bthome_publish(reading.mv, reading.percent);
+
+		BatteryReading battery_reading;
+		if (auto err = battery.sample(&battery_reading); err < 0)
+		{
+			LOG_ERR("battery sample failed (%d)", err);
+			return;
+		}
+
+		LOG_INF("soil %4d mV  ~%3d %% | batt %4d mV  ~%3d %%",
+				soil_reading.mv,
+				soil_reading.percent,
+				battery_reading.mv,
+				battery_reading.percent);
+		ui_show_reading(soil_reading.mv, soil_reading.percent);
+		bthome_publish(soil_reading.percent, battery_reading.mv, battery_reading.percent);
 	}
 
 	void measurement_cycle(struct k_work *)
@@ -62,6 +77,11 @@ int main()
 	if (soil.init() < 0)
 	{
 		LOG_ERR("soil init failed");
+		return 0;
+	}
+	if (battery.init() < 0)
+	{
+		LOG_ERR("battery init failed");
 		return 0;
 	}
 	if (ui_init() < 0)

@@ -14,6 +14,13 @@ constexpr int WINDOW_SIZE = 10;
 constexpr int32_t SOIL_MV_DRY = 2000;
 constexpr int32_t SOIL_MV_WET = 1500;
 
+/** Battery smoothing over the last N samples. */
+constexpr int BATTERY_WINDOW_SIZE = 6;
+
+/** Li-Ion voltage clamp for percentage mapping. */
+constexpr int32_t BATTERY_MV_EMPTY = 3300;
+constexpr int32_t BATTERY_MV_FULL = 4200;
+
 /** Mood thresholds. percent >= HAPPY_PCT -> happy; >= MEH_PCT -> meh;
  * below -> thirsty. */
 constexpr int MOOD_HAPPY_PCT = 60;

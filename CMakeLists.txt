@@ -13,6 +13,7 @@ target_sources(app PRIVATE
 	src/main.cpp
 	src/display_ui.cpp
 	src/soil.cpp
+	src/battery.cpp
 	src/bthome_adv.cpp
 	# Vendored SSD16XX display driver with PM support.
 	# See src/drivers/README.md. Paired with CONFIG_SSD16XX=n.

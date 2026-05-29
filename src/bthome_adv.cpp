@@ -77,15 +77,23 @@ int bthome_init(void)
 	return 0;
 }
 
-int bthome_publish(int32_t mv, int percent)
+int bthome_publish(int moisture_percent, int32_t battery_mv, int battery_percent)
 {
-	if (percent < 0)
+	if (moisture_percent < 0)
 	{
-		percent = 0;
+		moisture_percent = 0;
 	}
-	if (percent > 100)
+	if (moisture_percent > 100)
 	{
-		percent = 100;
+		moisture_percent = 100;
+	}
+	if (battery_percent < 0)
+	{
+		battery_percent = 0;
+	}
+	if (battery_percent > 100)
+	{
+		battery_percent = 100;
 	}
 
 	++packet_counter;
@@ -96,9 +104,9 @@ int bthome_publish(int32_t mv, int percent)
 
 	BTHomePacket<31> packet;
 	packet.add(BTHome::packet_id(packet_counter));
-	packet.add(BTHome::moisture(static_cast<float>(percent)));
-	packet.add(BTHome::battery(100)); // stub until a monitor is wired
-	packet.add(BTHome::voltage(mv / 1000.0f));
+	packet.add(BTHome::moisture(static_cast<float>(moisture_percent)));
+	packet.add(BTHome::battery(battery_percent));
+	packet.add(BTHome::voltage(battery_mv / 1000.0f));
 	if (!with_name)
 	{
 		packet.add(BTHome::firmware_version_u24(FW_VERSION));
