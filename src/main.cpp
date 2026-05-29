@@ -1,4 +1,6 @@
 #include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/pm/device.h>
 #include <zephyr/logging/log.h>
 
 #include "app_config.h"
@@ -12,8 +14,19 @@ namespace
 {
 	const adc_dt_spec soil0_adc = ADC_DT_SPEC_GET(DT_PATH(zephyr_user));
 	const gpio_dt_spec soil0_pwr = GPIO_DT_SPEC_GET(DT_PATH(zephyr_user), soil_power_gpios);
+	const struct device *const log_uart = DEVICE_DT_GET(DT_NODELABEL(uart1));
 	
 	SoilSensor soil(soil0_adc, soil0_pwr, cfg::SOIL_MV_DRY, cfg::SOIL_MV_WET);
+
+	void set_log_uart_sleep(bool sleep)
+	{
+		if (!device_is_ready(log_uart))
+		{
+			return;
+		}
+		const pm_device_action action = sleep ? PM_DEVICE_ACTION_SUSPEND : PM_DEVICE_ACTION_RESUME;
+		(void)pm_device_action_run(log_uart, action);
+	}
 
 	void measurement_cycle(struct k_work *work);
 	K_WORK_DELAYABLE_DEFINE(measurement_work, measurement_cycle);
@@ -33,7 +46,9 @@ namespace
 
 	void measurement_cycle(struct k_work *)
 	{
+		set_log_uart_sleep(false);
 		sample_and_publish();
+		set_log_uart_sleep(true);
 		k_work_reschedule(&measurement_work, cfg::MEASUREMENT_INTERVAL);
 	}
 
@@ -41,6 +56,9 @@ namespace
 
 int main()
 {
+	set_log_uart_sleep(false);
+	LOG_INF("UART1 TX test active on P1.06 @115200");
+
 	if (soil.init() < 0)
 	{
 		LOG_ERR("soil init failed");
@@ -60,5 +78,6 @@ int main()
 	/** Let the boot splash finish rendering (~3 s for a full SSD1681
 	 * refresh) before the first sample replaces it. */
 	k_work_schedule(&measurement_work, K_SECONDS(4));
+	set_log_uart_sleep(true);
 	return 0;
 }

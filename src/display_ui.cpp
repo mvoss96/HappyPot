@@ -42,7 +42,8 @@ namespace
 	 * wakes the SSD1681 (HW reset + minimal re-init); RENDER_READY puts it into
 	 * Deep Sleep Mode 1, which drops the controller to ~uA *while retaining its
 	 * RAM* (mode 1, not mode 2). RAM retention is what lets the next refresh be a
-	 * partial update. VCC stays up the whole time (ext_3v3 is regulator-boot-on),
+	 * partial update. VCC stays up the whole time (panel rail is wired directly to
+	 * BAT/VCC on this hardware),
 	 * so only the controller deep-sleeps, not the rail. The caller blocks inside
 	 * the flush (the driver busy-waits on BUSY), so by RENDER_READY the refresh
 	 * has finished and deep sleep is safe. */
