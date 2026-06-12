@@ -17,10 +17,6 @@ namespace cfg
     /** Battery smoothing over the last N samples. */
     constexpr int BATTERY_WINDOW_SIZE = 6;
 
-    /** Li-Ion voltage clamp for percentage mapping. */
-    constexpr int32_t BATTERY_MV_EMPTY = 3500;
-    constexpr int32_t BATTERY_MV_FULL = 4100;
-
     /** Show dedicated low-battery warning screen at or below this percentage. */
     constexpr int LOW_BATTERY_PCT = 5;
 

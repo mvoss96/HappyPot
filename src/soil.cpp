@@ -88,12 +88,25 @@ int SoilSensor::read_raw_mv(int32_t *mv_out)
 
 int SoilSensor::mv_to_percent(int32_t mv) const
 {
+	if (m_dry_mv == m_wet_mv)
+		return 0;
 	int pct = ((m_dry_mv - mv) * 100) / (m_dry_mv - m_wet_mv);
 	if (pct < 0)
 		pct = 0;
 	if (pct > 100)
 		pct = 100;
 	return pct;
+}
+
+int SoilSensor::sample_raw(int32_t *mv_out)
+{
+	return read_raw_mv(mv_out);
+}
+
+void SoilSensor::set_calibration(int32_t dry_mv, int32_t wet_mv)
+{
+	m_dry_mv = dry_mv;
+	m_wet_mv = wet_mv;
 }
 
 int SoilSensor::sample(SoilReading *out)

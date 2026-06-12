@@ -28,6 +28,15 @@ public:
 	 * the smoothed value across all samples held so far via *out. */
 	int sample(SoilReading *out);
 
+	/** One-shot raw reading without touching the rolling average.
+	 *  Used during calibration to capture the probe voltage. */
+	int sample_raw(int32_t *mv_out);
+
+	/** Replace the calibration endpoints at runtime. */
+	void set_calibration(int32_t dry_mv, int32_t wet_mv);
+	int32_t dry_mv() const { return m_dry_mv; }
+	int32_t wet_mv() const { return m_wet_mv; }
+
 private:
 	int read_raw_mv(int32_t *mv_out);
 	int mv_to_percent(int32_t mv) const;

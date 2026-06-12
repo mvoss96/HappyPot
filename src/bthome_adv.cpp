@@ -12,7 +12,6 @@ LOG_MODULE_REGISTER(bthome, LOG_LEVEL_INF);
 
 namespace
 {
-
 	bt_le_ext_adv *adv = nullptr;
 	uint8_t packet_counter = 0;
 
@@ -77,7 +76,7 @@ int bthome_init(void)
 	return 0;
 }
 
-int bthome_publish(int moisture_percent, int32_t battery_mv, int battery_percent)
+int bthome_publish(int moisture_percent, int32_t soil_mv, int32_t battery_mv, int battery_percent)
 {
 	if (moisture_percent < 0)
 	{
@@ -97,26 +96,30 @@ int bthome_publish(int moisture_percent, int32_t battery_mv, int battery_percent
 	}
 
 	++packet_counter;
-	/** Alternate packets: odd (1st, 3rd, ...) -> name (no fw), even -> fw
-	 * (no name). The 31-byte legacy advert can't hold both at once; name +
-	 * fw are static so HA caches whichever it sees. */
-	const bool with_name = (packet_counter % 2) == 1;
 
 	BTHomePacket<31> packet;
 	packet.add(BTHome::packet_id(packet_counter));
 	packet.add(BTHome::moisture(static_cast<float>(moisture_percent)));
 	packet.add(BTHome::battery(battery_percent));
+	/** Both voltages always go in the same packet so a single advert carries the
+	 * full reading: voltage = battery (V), voltage_c1 = soil ADC (V). */
 	packet.add(BTHome::voltage(battery_mv / 1000.0f));
-	if (!with_name)
-	{
-		packet.add(BTHome::firmware_version_u24(FW_VERSION));
-	}
+	packet.add(BTHome::voltage_c1(soil_mv / 1000.0f));
 
 	const bt_data svc = BT_DATA(BT_DATA_SVC_DATA16, packet.serviceData(), static_cast<uint8_t>(packet.serviceDataSize()));
 	const bt_data flags_ad = BT_DATA(BT_DATA_FLAGS, &flags, sizeof(flags));
 
-	if (with_name)
+	/** Alternate the extra field only: odd (1st, 3rd, ...) -> name (no fw),
+	 * even -> fw (no name). The 31-byte legacy advert can't hold both extras
+	 * on top of the always-present measurements. */
+	const bool with_name = (packet_counter % 2) == 1;
+	if (!with_name)
 	{
+		packet.add(BTHome::firmware_version_u24(FW_VERSION));
+	}
+	else
+	{
+
 		const char *name = bt_get_name();
 		const bt_data ad[] = {
 			flags_ad,

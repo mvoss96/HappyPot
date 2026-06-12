@@ -11,6 +11,7 @@ zephyr_compile_definitions(LV_LVGL_H_INCLUDE_SIMPLE)
 
 target_sources(app PRIVATE
 	src/main.cpp
+	src/calibration.cpp
 	src/display_ui.cpp
 	src/soil.cpp
 	src/battery.cpp
