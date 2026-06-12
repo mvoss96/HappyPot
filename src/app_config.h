@@ -28,6 +28,6 @@ namespace cfg
     /** Firmware version, broadcast via BTHome (obj 0xF2, shown as MAJOR.MINOR.PATCH). */
     constexpr uint8_t FW_VERSION_MAJOR = 0;
     constexpr uint8_t FW_VERSION_MINOR = 1;
-    constexpr uint8_t FW_VERSION_PATCH = 1;
+    constexpr uint8_t FW_VERSION_PATCH = 2;
 
 } // namespace cfg

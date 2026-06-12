@@ -1,6 +1,7 @@
 #include "display_ui.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <lvgl.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/display.h>
@@ -20,6 +21,7 @@ namespace
 	lv_obj_t *pct_label;
 	lv_obj_t *boot_meta_label;
 	lv_obj_t *low_batt_icon;
+	lv_obj_t *calib_icon;
 	lv_obj_t *calib_label;
 
 	unsigned design = 1;
@@ -41,6 +43,15 @@ namespace
 													: 0;
 		unsigned d = (design < 2) ? design : 0;
 		return icon_table[d][mood];
+	}
+
+	const lv_image_dsc_t *calib_image_for(const char *label)
+	{
+		if (strcmp(label, "WET") == 0)    return &cal_wet;
+		if (strcmp(label, "DRY") == 0)    return &cal_dry;
+		if (strcmp(label, "RESET") == 0)  return &cal_reset;
+		if (strcmp(label, "CANCEL") == 0) return &cal_reset;
+		return &cal_done;
 	}
 
 	/** Bracket each refresh with the panel's own power management. RENDER_START
@@ -116,14 +127,18 @@ int ui_init()
 	lv_obj_align(low_batt_icon, LV_ALIGN_CENTER, 0, 0);
 	lv_obj_add_flag(low_batt_icon, LV_OBJ_FLAG_HIDDEN);
 
+	calib_icon = lv_image_create(scr);
+	lv_obj_align(calib_icon, LV_ALIGN_CENTER, 0, 0);
+	lv_obj_add_flag(calib_icon, LV_OBJ_FLAG_HIDDEN);
+
 	calib_label = lv_label_create(scr);
-	lv_obj_set_style_text_font(calib_label, &lv_font_montserrat_16, 0);
+	lv_obj_set_style_text_font(calib_label, &lv_font_montserrat_40, 0);
 	lv_obj_set_style_text_color(calib_label, lv_color_black(), 0);
 	lv_obj_set_style_bg_color(calib_label, lv_color_white(), 0);
 	lv_obj_set_style_bg_opa(calib_label, LV_OPA_COVER, 0);
 	lv_obj_set_style_text_align(calib_label, LV_TEXT_ALIGN_CENTER, 0);
 	lv_obj_set_width(calib_label, lv_pct(100));
-	lv_obj_align(calib_label, LV_ALIGN_CENTER, 0, 0);
+	lv_obj_align(calib_label, LV_ALIGN_BOTTOM_MID, 0, -4);
 	lv_obj_add_flag(calib_label, LV_OBJ_FLAG_HIDDEN);
 
 	display_blanking_off(display);
@@ -159,6 +174,7 @@ int ui_show_reading(int32_t /*mv*/, int percent)
 	lv_obj_clear_flag(icon, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(boot_meta_label, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(low_batt_icon, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(calib_icon, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(calib_label, LV_OBJ_FLAG_HIDDEN);
 	lv_label_set_text(pct_label, pct);
 	lv_obj_clear_flag(pct_label, LV_OBJ_FLAG_HIDDEN);  // reveal after first reading
@@ -191,6 +207,7 @@ int ui_show_low_battery(int battery_percent)
 	lv_obj_add_flag(icon, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(pct_label, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(boot_meta_label, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(calib_icon, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(calib_label, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_clear_flag(low_batt_icon, LV_OBJ_FLAG_HIDDEN);
 
@@ -201,25 +218,45 @@ int ui_show_low_battery(int battery_percent)
 	return 0;
 }
 
-void ui_show_calibration_step(const char *label, int32_t mv)
+static void calib_show_common(const lv_image_dsc_t *img)
 {
-	char buf[32];
-	if (mv >= 0) {
-		snprintf(buf, sizeof(buf), "%s\n%ld mV", label, (long)mv);
-	} else {
-		snprintf(buf, sizeof(buf), "%s", label);
-	}
-
 	lv_obj_add_flag(icon, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(pct_label, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(boot_meta_label, LV_OBJ_FLAG_HIDDEN);
 	lv_obj_add_flag(low_batt_icon, LV_OBJ_FLAG_HIDDEN);
+	lv_image_set_src(calib_icon, img);
+	lv_obj_clear_flag(calib_icon, LV_OBJ_FLAG_HIDDEN);
+	last_shown_percent = -1;
+	low_batt_visible = false;
+}
+
+void ui_show_calibration_step(const char *label, int32_t mv)
+{
+	calib_show_common(&cal_done);
+	char buf[16];
+	snprintf(buf, sizeof(buf), "%ld mV", (long)mv);
 	lv_label_set_text(calib_label, buf);
 	lv_obj_clear_flag(calib_label, LV_OBJ_FLAG_HIDDEN);
 
 	lv_refr_now(lv_display_get_default());
+}
 
-	/* Force ui_show_reading to repaint after calibration clears this screen. */
+void ui_show_calibration_step(const char *label)
+{
+	calib_show_common(calib_image_for(label));
+	lv_obj_add_flag(calib_label, LV_OBJ_FLAG_HIDDEN);
+
+	lv_refr_now(lv_display_get_default());
+}
+
+void ui_exit_calibration()
+{
+	lv_obj_add_flag(calib_icon, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_add_flag(calib_label, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_clear_flag(icon, LV_OBJ_FLAG_HIDDEN);
+	lv_obj_clear_flag(pct_label, LV_OBJ_FLAG_HIDDEN);
 	last_shown_percent = -1;
 	low_batt_visible = false;
+
+	lv_refr_now(lv_display_get_default());
 }

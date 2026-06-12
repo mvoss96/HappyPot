@@ -8,6 +8,10 @@ extern "C" {
 #endif
 
 LV_IMAGE_DECLARE(boot);
+LV_IMAGE_DECLARE(cal_done);
+LV_IMAGE_DECLARE(cal_dry);
+LV_IMAGE_DECLARE(cal_reset);
+LV_IMAGE_DECLARE(cal_wet);
 LV_IMAGE_DECLARE(lowbat);
 LV_IMAGE_DECLARE(s0_happy);
 LV_IMAGE_DECLARE(s0_meh);

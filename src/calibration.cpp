@@ -120,7 +120,7 @@ static void nvs_save()
 // ---------------------------------------------------------------------------
 // Calibration thread
 // Hold 0.5–2 s  → WET   Hold 2–4 s → DRY
-// Hold 4–6 s   → RESET  Hold 6 s+  → CANCEL
+// Hold 4–6 s   → RESET  Hold 6 s+  → auto-cancel (returns to main)
 // ---------------------------------------------------------------------------
 
 constexpr int64_t CAL_MIN_HOLD_MS = 500;
@@ -134,7 +134,6 @@ enum class CalMode
     WET,
     DRY,
     RESET,
-    CANCEL
 };
 
 static K_SEM_DEFINE(s_ready, 0, 1);
@@ -156,36 +155,46 @@ static void calib_thread_fn(void *, void *, void *)
         uart_wake();
 
         // Poll while held, updating display on each phase change.
+        bool auto_cancelled = false;
         while (gpio_pin_get_dt(s_btn) != 0)
         {
             int64_t held = k_uptime_get() - t0;
-            CalMode p = (held < CAL_MIN_HOLD_MS)       ? CalMode::NONE
-                        : (held < CAL_PHASE_DRY_MS)    ? CalMode::WET
-                        : (held < CAL_PHASE_RST_MS)    ? CalMode::DRY
-                        : (held < CAL_PHASE_CANCEL_MS) ? CalMode::RESET
-                                                       : CalMode::CANCEL;
+            if (held >= CAL_PHASE_CANCEL_MS)
+            {
+                LOG_INF(">> auto-cancel");
+                ui_exit_calibration();
+                uart_sleep();
+                k_work_reschedule(s_resume, K_NO_WAIT);
+                while (gpio_pin_get_dt(s_btn) != 0)
+                    k_msleep(20);
+                auto_cancelled = true;
+                break;
+            }
+            CalMode p = (held < CAL_MIN_HOLD_MS)    ? CalMode::NONE
+                        : (held < CAL_PHASE_DRY_MS) ? CalMode::WET
+                        : (held < CAL_PHASE_RST_MS) ? CalMode::DRY
+                                                    : CalMode::RESET;
             if (p != phase)
             {
                 phase = p;
-                const char *lbl = (p == CalMode::WET)      ? "CAL WET"
-                                  : (p == CalMode::DRY)    ? "CAL DRY"
-                                  : (p == CalMode::RESET)  ? "RESET"
-                                  : (p == CalMode::CANCEL) ? "CANCEL"
-                                                           : nullptr;
+                const char *lbl = (p == CalMode::WET)    ? "WET"
+                                  : (p == CalMode::DRY)  ? "DRY"
+                                  : (p == CalMode::RESET) ? "RESET"
+                                                          : nullptr;
                 if (lbl)
                 {
                     LOG_INF(">> %s", lbl);
-                    ui_show_calibration_step(lbl, -1);
+                    ui_show_calibration_step(lbl);
                 }
             }
             k_msleep(50);
         }
+        if (auto_cancelled)
+            continue;
 
-        // Short press or held into cancel — return to main loop.
-        if (phase == CalMode::NONE || phase == CalMode::CANCEL)
+        // Short press — return to main loop.
+        if (phase == CalMode::NONE)
         {
-            if (phase != CalMode::NONE)
-                LOG_INF("button: cancelled");
             uart_sleep();
             k_work_reschedule(s_resume, K_NO_WAIT);
             continue;
@@ -203,7 +212,6 @@ static void calib_thread_fn(void *, void *, void *)
         // WET or DRY: one read with the normal power-on/settle/off cycle.
         const bool is_wet = (phase == CalMode::WET);
         LOG_INF("entered %s calibration", is_wet ? "wet" : "dry");
-        ui_show_calibration_step(is_wet ? "CAL WET\nsampling..." : "CAL DRY\nsampling...", -1);
 
         int32_t mv;
         if (s_soil->sample_raw(&mv) != 0)
@@ -226,7 +234,7 @@ static void calib_thread_fn(void *, void *, void *)
             LOG_INF("saved dry: %d mV  (wet=%d mV)", mv, s_soil->wet_mv());
         uart_sleep();
 
-        ui_show_calibration_step(is_wet ? "CAL WET" : "CAL DRY", mv);
+        ui_show_calibration_step(is_wet ? "WET" : "DRY", mv);
         k_work_reschedule(s_resume, K_SECONDS(3));
     }
 }
