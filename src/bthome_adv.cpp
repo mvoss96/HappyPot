@@ -104,7 +104,7 @@ int bthome_publish(int moisture_percent, int32_t soil_mv, int32_t battery_mv, in
 	/** Both voltages always go in the same packet so a single advert carries the
 	 * full reading: voltage = battery (V), voltage_c1 = soil ADC (V). */
 	packet.add(BTHome::voltage(battery_mv / 1000.0f));
-	packet.add(BTHome::voltage_c1(soil_mv / 1000.0f));
+	packet.add(BTHome::voltage(soil_mv / 1000.0f));
 
 	const bt_data svc = BT_DATA(BT_DATA_SVC_DATA16, packet.serviceData(), static_cast<uint8_t>(packet.serviceDataSize()));
 	const bt_data flags_ad = BT_DATA(BT_DATA_FLAGS, &flags, sizeof(flags));
