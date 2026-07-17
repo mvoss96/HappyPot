@@ -1,0 +1,189 @@
+/*
+ * HappyPot's hardware, shared by both builds: the BTHome firmware (apps/bthome/app.overlay) and
+ * the Matter build (apps/matter/boards/promicro_nrf52840_nrf52840.overlay). One description, so
+ * the two cannot drift apart.
+ *
+ *   Soil probe -> capacitive v2.0, AOUT=P0.31 (AIN7), VCC gated by P0.17 (powered only while
+ *                 sampling: ~5 mA otherwise continuous, and permanent bias corrodes the probe)
+ *   Battery    -> SAADC internal VDDH/5 path (no external divider)
+ *   Button     -> P1.04 (active-low, internal pull-up)
+ *   E-Paper    -> WeAct Studio 1.54" 200x200 (SSD1681)
+ *                 SPI2: SCK=P1.11, MOSI=P1.13, CS=P0.10
+ *                 DC=P0.09, RST=P0.29, BUSY=P0.02 (active-high), 3V3 rail enable=P0.13
+ *   Console    -> uart1, TX-only on P1.06 (uart0 is disabled: its default pins P0.09/P0.10
+ *                 are the display's DC/CS)
+ */
+
+#include <zephyr/dt-bindings/adc/adc.h>
+#include <zephyr/dt-bindings/adc/nrf-saadc.h>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zephyr/dt-bindings/regulator/nrf5x.h>
+
+/* Where things live in flash -- and, above all, where the bootloader lives so nothing lands on it. */
+#include "happypot_flash.dtsi"
+
+/* Disable uart0 so P0.09/P0.10 are free for the display. */
+&uart0 {
+	status = "disabled";
+};
+
+&pinctrl {
+	uart1_default_alt: uart1_default_alt {
+		group1 {
+			/* TX-only on P1.06; RX disconnected so P1.04 is free for the button. */
+			psels = <NRF_PSEL(UART_TX, 1, 6)>,
+				<NRF_PSEL_DISCONNECTED(UART_RX)>;
+		};
+	};
+
+	uart1_sleep_alt: uart1_sleep_alt {
+		group1 {
+			psels = <NRF_PSEL(UART_TX, 1, 6)>,
+				<NRF_PSEL_DISCONNECTED(UART_RX)>;
+			low-power-enable;
+		};
+	};
+};
+
+&uart1 {
+	current-speed = <115200>;
+	pinctrl-0 = <&uart1_default_alt>;
+	pinctrl-1 = <&uart1_sleep_alt>;
+	pinctrl-names = "default", "sleep";
+	status = "okay";
+};
+
+/* Remap SPI2 to the e-paper wiring: SCK=P1.11, MOSI=P1.13 (write-only, no MISO). */
+&spi2_default {
+	group1 {
+		psels = <NRF_PSEL(SPIM_SCK, 1, 11)>,
+			<NRF_PSEL(SPIM_MOSI, 1, 13)>;
+	};
+};
+
+&spi2_sleep {
+	group1 {
+		psels = <NRF_PSEL(SPIM_SCK, 1, 11)>,
+			<NRF_PSEL(SPIM_MOSI, 1, 13)>;
+		low-power-enable;
+	};
+};
+
+&spi2 {
+	cs-gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
+};
+
+/*
+ * Enable the REG1 DC/DC buck (default is LDO). ~2x more efficient than the LDO at the mA-level
+ * active currents (refresh, BLE TX). Requires the on-module DCC inductor to be populated --
+ * standard on ProMicro/nice!nano clones; if a board browns out on boot, remove this override.
+ */
+&reg1 {
+	regulator-initial-mode = <NRF5X_REG_MODE_DCDC>;
+};
+
+/ {
+	chosen {
+		zephyr,display = &epaper;
+		zephyr,console = &uart1;
+	};
+
+	keys: buttons {
+		compatible = "gpio-keys";
+
+		button0: button_0 {
+			/* P1.04, pressed = LOW, enable internal pull-up */
+			gpios = <&gpio1 4 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			label = "User button";
+			zephyr,code = <INPUT_KEY_0>;
+		};
+	};
+
+	/*
+	 * Turn the one button's raw press/release into a tap/hold pair. The driver emits
+	 * ENTER on a short press (on release) and MENU the moment the hold threshold passes
+	 * (while still held) -- so button.cpp only has to map two codes, not time the press.
+	 */
+	longpress: longpress {
+		compatible = "zephyr,input-longpress";
+		input = <&keys>;
+		input-codes = <INPUT_KEY_0>;
+		short-codes = <INPUT_KEY_ENTER>;
+		long-codes = <INPUT_KEY_MENU>;
+		long-delay-ms = <700>;
+	};
+
+	/* Nothing we build reads sw0 -- button.cpp goes through the input subsystem. It is here
+	 * because it is the conventional name for "the button", and because NCS's DK library (which
+	 * the Matter build deliberately does not enable) looks for it. */
+	aliases {
+		sw0 = &button0;
+	};
+
+	mipi_dbi_epaper {
+		compatible = "zephyr,mipi-dbi-spi";
+		spi-dev = <&spi2>;
+		dc-gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		epaper: ssd1681@0 {
+			compatible = "solomon,ssd1681";
+			mipi-max-frequency = <1000000>;
+			reg = <0>;
+			width = <200>;
+			height = <200>;
+			rotation = <270>;
+			busy-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+			tssv = <0x80>;
+
+			/*
+			 * Empty profiles -> the driver uses the waveform defaults from the panel's OTP
+			 * (like GxEPD2_154_D67). That keeps the VBD border (register 0x3C) on its default
+			 * instead of black.
+			 *
+			 * The partial node stays: the rail is always on, the controller keeps its old
+			 * frame -> partial refresh (fast, no black flash) is possible.
+			 */
+			full {
+			};
+
+			partial {
+			};
+		};
+	};
+
+	zephyr,user {
+		io-channels = <&adc 0>, <&adc 1>;
+		/* Soil sensor VCC is fed directly from P0.17 so it is only powered while
+		 * sampling (~5 mA otherwise continuous). */
+		soil-power-gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&adc {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@0 {
+		reg = <0>;
+		zephyr,gain = "ADC_GAIN_1_5";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 10)>;
+		zephyr,input-positive = <NRF_SAADC_AIN7>;
+		zephyr,resolution = <12>;
+	};
+
+	channel@1 {
+		reg = <1>;
+		zephyr,gain = "ADC_GAIN_1_6";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 10)>;
+		/* Measure the raw battery rail through SAADC's internal VDDH/5 path. */
+		zephyr,input-positive = <NRF_SAADC_VDDHDIV5>;
+		zephyr,resolution = <12>;
+	};
+};

@@ -1,0 +1,7 @@
+# The sample this is derived from defaulted the bootloader to MCUboot and turned on factory-data
+# generation, DFU multi-image packaging and a network-core image -- all of it for boards we do
+# not build or for a boot flow we deliberately do not use. HappyPot is a single-core nRF52840
+# booting a plain image from the Adafruit UF2 bootloader. The switches that matter live in
+# sysbuild.conf; everything else takes the upstream default.
+
+source "share/sysbuild/Kconfig"

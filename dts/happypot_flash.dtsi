@@ -1,0 +1,52 @@
+/*
+ * The flash map, shared by both builds -- because both run on the same board, on top of the same
+ * bootloader, and there is only one truth about where things live.
+ *
+ *   0x00000000  MBR                    4 KB   part of the nice!nano bootloader, already on the chip
+ *   0x00001000  code                 940 KB   the application
+ *   0x000EC000  storage               32 KB   NVS/settings (calibration; Matter fabrics)
+ *   0x000F4000  UF2 bootloader        48 KB   RESERVED -- Adafruit nRF52 bootloader + its settings
+ *
+ * No MCUboot: a plain single image linked at 0x1000, which is exactly where the bootloader starts
+ * an app when no SoftDevice is present -- and none is. (Do not be misled by the "s140" in the
+ * bootloader's name: it probes for a SoftDevice at boot, finds none, and falls back to 0x1000.
+ * The /uf2 board variant, which links at 0x26000 for an SD-based layout, does NOT boot here.)
+ *
+ * The board's own map is the reason this file exists. Zephyr's promicro_nrf52840 (plain) pulls in
+ * nrf52840_partition.dtsi, which describes a board we do not have: an MCUboot pair that nothing
+ * uses, and -- the dangerous one -- a storage_partition INSIDE the bootloader's 0xF4000+ region.
+ * HappyPot's calibration NVS lived exactly there (partition manager placed it at 0xFA000), so
+ * every calibration save wrote into bootloader flash. That failure is silent: the device keeps
+ * booting (the MBR just skips the now-invalid bootloader), only the USB drive never comes back.
+ *
+ * So the stock nodes are deleted and replaced, and the bootloader's 48 KB are left as a hole no
+ * partition claims. Bounding the image is the other half of the guard and lives in
+ * conf/happypot_hw.conf (CONFIG_FLASH_LOAD_SIZE) -- keep the two in step.
+ */
+
+/delete-node/ &boot_partition;
+/delete-node/ &slot0_partition;
+/delete-node/ &slot1_partition;
+/delete-node/ &storage_partition;
+
+/ {
+	chosen {
+		zephyr,code-partition = &code_partition;
+	};
+};
+
+&flash0 {
+	partitions {
+		code_partition: partition@1000 {
+			compatible = "zephyr,mapped-partition";
+			label = "code";
+			reg = <0x00001000 0x000eb000>;
+		};
+
+		storage_partition: partition@ec000 {
+			compatible = "zephyr,mapped-partition";
+			label = "storage";
+			reg = <0x000ec000 0x00008000>;
+		};
+	};
+};

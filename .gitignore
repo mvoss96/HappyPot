@@ -4,3 +4,11 @@
 
 # build
 /build*/
+apps/*/build*/
+
+# Per-app copies of <repo>/VERSION, made by cmake/happypot_version.cmake at configure time.
+apps/*/VERSION
+
+# host preview (sim/build.ps1)
+sim/build/
+sim/out/
