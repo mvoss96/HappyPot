@@ -56,9 +56,10 @@ namespace
 		LOG_INF("soil %4d mV  ~%3d %% | batt %4d mV  ~%3d %%",
 				r.soil.mv, r.soil.percent, r.battery.mv, r.battery.percent);
 
+		ui::set_battery(r.battery.percent); // the menu's corner readout
 		if (r.battery.percent <= cfg::LOW_BATTERY_PCT)
 		{
-			ui::set_low_battery(r.battery.percent);
+			ui::set_low_battery();
 		}
 		else
 		{

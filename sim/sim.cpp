@@ -140,8 +140,11 @@ int main(int argc, char **argv)
 	ui::set_sensor(1930, 12); // thirsty
 	shoot("sensor_thirsty");
 
-	ui::set_low_battery(4);
+	ui::set_low_battery();
 	shoot("lowbat");
+
+	// The menu's corner readout, as the loop stages it after every measurement.
+	ui::set_battery(87);
 
 	// The menu. It is a list of strings with a cursor -- the display does not know what the
 	// entries mean, so the sim says them out loud, exactly as menu.cpp's tables would.
@@ -182,7 +185,7 @@ int main(int argc, char **argv)
 	ui::set_calib_reset_prompt();
 	shoot("cal_reset_prompt");
 
-	ui::set_calib_result(1452);
+	ui::set_calib_result();
 	shoot("cal_result");
 
 	if (matter)

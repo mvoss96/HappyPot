@@ -17,9 +17,10 @@ set(HAPPYPOT_DEVICE_SOURCES
 	${HAPPYPOT_ROOT}/src/sensors/battery.cpp
 	${HAPPYPOT_ROOT}/src/ui/display_ui.cpp
 	${HAPPYPOT_ROOT}/src/ui/ui_platform.cpp
-	# Generated 1bpp digit subset for the big value labels (see src/fonts/README.md);
-	# the full built-in Montserrat 40 costs ~70 KB the Matter image does not have.
+	# Generated 1bpp fonts, strong-autohinted for the 1-bit panel (see src/fonts/README.md);
+	# the full built-in Montserrat 40 alone costs ~70 KB the Matter image does not have.
 	${HAPPYPOT_ROOT}/src/fonts/montserrat_40_digits.c
+	${HAPPYPOT_ROOT}/src/fonts/montserrat_16_ui.c
 	# Vendored SSD16XX display driver with PM_DEVICE deep-sleep support.
 	# See src/drivers/README.md. Paired with CONFIG_SSD16XX=n.
 	${HAPPYPOT_ROOT}/src/drivers/ssd16xx.c

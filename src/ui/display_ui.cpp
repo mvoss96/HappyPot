@@ -22,7 +22,7 @@
  * value labels never draw. C linkage. */
 extern "C"
 {
-	extern const lv_font_t montserrat_40_digits;
+	extern const lv_font_t montserrat_40_digits, montserrat_16_ui;
 }
 
 /*
@@ -40,30 +40,32 @@ namespace
 	constexpr int SCR_W = 200, SCR_H = 200;
 	constexpr int FULL_REFRESH_EVERY = 100;
 
-	/* The menu: a block of entries over a hint line. The static_assert is load-bearing -- LVGL
-	 * happily paints labels over each other, so a row that no longer fits must fail the build. */
+	/* The menu: a battery readout strip, a block of entries, a hint line. The static_assert is
+	 * load-bearing -- LVGL happily paints labels over each other, so a row that no longer fits
+	 * must fail the build. */
+	constexpr int MENU_BATT_H = 22; // reserved for the corner readout; rows start below it
 	constexpr int MENU_HINT_H = 24;
 	constexpr int MENU_ITEM_H = 36;
 
-	static_assert(ui::LIST_MAX_ROWS * MENU_ITEM_H + MENU_HINT_H <= SCR_H,
-				  "the menu entries no longer fit above the hint -- shrink MENU_ITEM_H, or the "
-				  "panel will draw them on top of each other");
+	static_assert(ui::LIST_MAX_ROWS * MENU_ITEM_H + MENU_BATT_H + MENU_HINT_H <= SCR_H,
+				  "the menu entries no longer fit between the readout and the hint -- shrink "
+				  "MENU_ITEM_H, or the panel will draw them on top of each other");
 
 	inline int menu_top(int rows)
 	{
-		return (SCR_H - MENU_HINT_H - rows * MENU_ITEM_H) / 2;
+		return MENU_BATT_H + (SCR_H - MENU_BATT_H - MENU_HINT_H - rows * MENU_ITEM_H) / 2;
 	}
 
 	// Content views (exactly one un-hidden at a time).
 	lv_obj_t *boot_root;
 	lv_obj_t *sensor_root, *sensor_icon, *sensor_pct;
 	lv_obj_t *error_root, *err_title_lbl, *err_detail_lbl;
-	lv_obj_t *lowbat_root, *lowbat_pct_lbl;
+	lv_obj_t *lowbat_root;
 	lv_obj_t *reset_root;
 	/* THE menu. One set of widgets, and it draws whatever list it is handed -- it does not know
 	 * that a root and a Calibrate sub-menu exist, because to a panel they are four strings and a
 	 * cursor, twice. */
-	lv_obj_t *list_root, *list_cursor;
+	lv_obj_t *list_root, *list_cursor, *list_batt_lbl;
 	lv_obj_t *list_item[ui::LIST_MAX_ROWS];
 	int list_rows = 0; // how many are in use right now; the rest are hidden
 	int list_sel = -1; // -1 = nothing drawn yet
@@ -73,10 +75,10 @@ namespace
 	 * never pays for it. */
 	lv_obj_t *pair_root, *pair_qr_obj, *pair_code_lbl, *pair_state_lbl, *pair_hint_lbl;
 
-	/* The calibration screens share the full-canvas artwork idiom of the sensor view: one image
-	 * per screen (cal_wet / cal_dry / cal_reset / cal_done), a hint, and -- on the result -- the
-	 * captured millivolts. */
-	lv_obj_t *calib_root, *calib_img, *calib_value_lbl, *calib_hint_lbl;
+	/* The calibration screens: one artwork per screen (cal_wet / cal_dry / cal_reset /
+	 * cal_done), cropped to its pictogram -- the baked-in caption at the canvas bottom is where
+	 * the hint line lives now, and half a caption under a hint plate read as clutter. */
+	lv_obj_t *calib_root, *calib_img, *calib_hint_lbl;
 
 	/* Views + refresh bookkeeping. Setters stage `pending_view` and dirty the
 	 * widgets; ui::refresh() commits: hide/show the view + ONE panel refresh. */
@@ -106,8 +108,7 @@ namespace
 	/* Skip-refresh dedup. int, not the API's narrower types, because -1 = "nothing yet". */
 	int last_shown_percent = -1;
 	const lv_image_dsc_t *last_icon_src;
-	int last_lowbat_pct = -1;
-	int last_calib_mv = INT32_MIN;
+	int last_batt_pct = -1;
 
 	/** [design][mood] -> image. Mood order: 0=thirsty, 1=meh, 2=happy. */
 	const lv_image_dsc_t *const icon_table[2][3] = {
@@ -294,7 +295,7 @@ namespace
 
 		/* Which image is on the board. Two builds of this firmware exist and they look alike
 		 * everywhere else; the one moment the panel can say so for free is here. */
-		lv_obj_t *meta = make_label(boot_root, &lv_font_montserrat_16, lv_pct(100));
+		lv_obj_t *meta = make_label(boot_root, &montserrat_16_ui, lv_pct(100));
 		char line[48];
 		snprintf(line, sizeof(line), "%s\nv" HAPPYPOT_VERSION, build ? build : "");
 		lv_label_set_text(meta, line);
@@ -319,16 +320,17 @@ namespace
 	{
 		error_root = make_view(scr);
 
-		err_title_lbl = make_label(error_root, &lv_font_montserrat_16, SCR_W);
+		err_title_lbl = make_label(error_root, &montserrat_16_ui, SCR_W);
 		lv_label_set_text(err_title_lbl, "");
 		lv_obj_align(err_title_lbl, LV_ALIGN_CENTER, 0, -14);
 
-		err_detail_lbl = make_label(error_root, &lv_font_montserrat_16, SCR_W);
+		err_detail_lbl = make_label(error_root, &montserrat_16_ui, SCR_W);
 		lv_label_set_text(err_detail_lbl, "");
 		lv_obj_align(err_detail_lbl, LV_ALIGN_CENTER, 0, 14);
 	}
 
-	/** Build the low-battery warning: the artwork and the level. */
+	/** Build the low-battery warning: the artwork is the whole message. The exact percent
+	 * lives in the menu, where someone checking up on the cell looks. */
 	void build_lowbat(lv_obj_t *scr)
 	{
 		lowbat_root = make_view(scr);
@@ -336,10 +338,6 @@ namespace
 		lv_obj_t *art = lv_image_create(lowbat_root);
 		lv_image_set_src(art, &lowbat);
 		lv_obj_align(art, LV_ALIGN_CENTER, 0, 0);
-
-		lowbat_pct_lbl = make_label(lowbat_root, &lv_font_montserrat_16, 0);
-		lv_label_set_text(lowbat_pct_lbl, "");
-		lv_obj_align(lowbat_pct_lbl, LV_ALIGN_BOTTOM_MID, 0, -2);
 	}
 
 	/** Build the factory-reset view. */
@@ -347,13 +345,13 @@ namespace
 	{
 		reset_root = make_view(scr);
 
-		lv_obj_t *title = make_label(reset_root, &lv_font_montserrat_16, SCR_W);
+		lv_obj_t *title = make_label(reset_root, &montserrat_16_ui, SCR_W);
 		lv_label_set_text(title, "FACTORY RESET");
 		lv_obj_align(title, LV_ALIGN_CENTER, 0, -10);
 
 		// Tap is the reflex, so tap is the harmless one. Same rule as the calibration prompts.
-		lv_obj_t *hint = make_label(reset_root, &lv_font_montserrat_16, SCR_W);
-		lv_label_set_text(hint, "Tap=cancel   Hold=reset");
+		lv_obj_t *hint = make_label(reset_root, &montserrat_16_ui, SCR_W);
+		lv_label_set_text(hint, "Tap=cancel Hold=reset");
 		lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -6);
 	}
 
@@ -368,16 +366,25 @@ namespace
 		for (int i = 0; i < ui::LIST_MAX_ROWS; i++)
 		{
 			list_item[i] = lv_label_create(list_root);
-			lv_obj_set_style_text_font(list_item[i], &lv_font_montserrat_16, 0);
+			lv_obj_set_style_text_font(list_item[i], &montserrat_16_ui, 0);
 			lv_obj_set_style_text_color(list_item[i], lv_color_black(), 0);
 			lv_obj_set_style_text_align(list_item[i], LV_TEXT_ALIGN_CENTER, 0);
 			lv_obj_set_width(list_item[i], SCR_W - 24);
 			lv_label_set_text(list_item[i], "");
 		}
 
-		lv_obj_t *hint = make_label(list_root, &lv_font_montserrat_16, SCR_W);
-		lv_label_set_text(hint, "Tap=next   Hold=select");
+		lv_obj_t *hint = make_label(list_root, &montserrat_16_ui, SCR_W);
+		lv_label_set_text(hint, "Tap=next Hold=select");
 		lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -2);
+
+		/* The battery percent, top-right -- the one place it is spelled out. The sensor view
+		 * belongs to the plant, the low-battery view to its artwork; someone who wants the
+		 * number opens the menu, which is exactly "checking up". */
+		list_batt_lbl = lv_label_create(list_root);
+		lv_obj_set_style_text_font(list_batt_lbl, &montserrat_16_ui, 0);
+		lv_obj_set_style_text_color(list_batt_lbl, lv_color_black(), 0);
+		lv_label_set_text(list_batt_lbl, "");
+		lv_obj_align(list_batt_lbl, LV_ALIGN_TOP_RIGHT, -6, 2);
 	}
 
 	/** Build the pairing view: the QR with the manual code always under it (a camera is the
@@ -387,7 +394,7 @@ namespace
 	{
 		pair_root = make_view(scr);
 
-		lv_obj_t *hdr = make_label(pair_root, &lv_font_montserrat_16, SCR_W);
+		lv_obj_t *hdr = make_label(pair_root, &montserrat_16_ui, SCR_W);
 		lv_label_set_text(hdr, build ? build : "PAIRING");
 		lv_obj_align(hdr, LV_ALIGN_TOP_MID, 0, 0);
 
@@ -404,52 +411,56 @@ namespace
 		lv_qrcode_update(pair_qr_obj, qr, strlen(qr));
 		lv_obj_align(pair_qr_obj, LV_ALIGN_TOP_MID, 0, 26);
 
-		pair_code_lbl = make_label(pair_root, &lv_font_montserrat_16, SCR_W);
+		pair_code_lbl = make_label(pair_root, &montserrat_16_ui, SCR_W);
 		lv_label_set_text(pair_code_lbl, manual);
 		lv_obj_align(pair_code_lbl, LV_ALIGN_BOTTOM_MID, 0, -2);
 
 		/* The other half of the same screen: once on a fabric there is nothing to scan, so the
 		 * QR gives way to the state. Leaving the network is its own menu entry, not a gesture
 		 * hidden on a screen that reads like a status line. */
-		pair_state_lbl = make_label(pair_root, &lv_font_montserrat_16, SCR_W);
+		pair_state_lbl = make_label(pair_root, &montserrat_16_ui, SCR_W);
 		lv_label_set_text(pair_state_lbl, "CONNECTED");
 		lv_obj_align(pair_state_lbl, LV_ALIGN_CENTER, 0, -10);
 		lv_obj_add_flag(pair_state_lbl, LV_OBJ_FLAG_HIDDEN);
 
-		pair_hint_lbl = make_label(pair_root, &lv_font_montserrat_16, SCR_W);
-		lv_label_set_text(pair_hint_lbl, "Tap to go back");
+		pair_hint_lbl = make_label(pair_root, &montserrat_16_ui, SCR_W);
+		lv_label_set_text(pair_hint_lbl, "Tap=back");
 		lv_obj_align(pair_hint_lbl, LV_ALIGN_BOTTOM_MID, 0, -2);
 		lv_obj_add_flag(pair_hint_lbl, LV_OBJ_FLAG_HIDDEN);
 	}
 
-	/** Build the shared calibration skeleton: full-canvas artwork, a value, a hint. */
+	/** Build the shared calibration skeleton: the artwork's pictogram over a hint line.
+	 *
+	 * The artwork is cropped: its canvas carries a baked-in caption (WET/DRY/RESET/DONE) at the
+	 * bottom, which is where the hint now lives -- every screen keeps its "Tap=x   Hold=x" line
+	 * in the same place, and half a caption under a hint plate read as clutter. The pictogram
+	 * is the message. */
 	void build_calib(lv_obj_t *scr)
 	{
 		calib_root = make_view(scr);
 
-		calib_img = lv_image_create(calib_root);
-		lv_obj_align(calib_img, LV_ALIGN_CENTER, 0, 0);
+		/* The crop window shows art rows 30..142: below the three phase pills the old
+		 * hold-to-calibrate UI baked into the canvas top (the menu made them meaningless),
+		 * above the caption baked into its bottom. The pictogram in between is the message. */
+		lv_obj_t *crop = lv_obj_create(calib_root);
+		lv_obj_remove_style_all(crop);
+		lv_obj_set_size(crop, SCR_W, 112);
+		lv_obj_set_pos(crop, 0, 30);
+		lv_obj_clear_flag(crop, LV_OBJ_FLAG_SCROLLABLE);
+		calib_img = lv_image_create(crop);
+		lv_obj_align(calib_img, LV_ALIGN_TOP_MID, 0, -30);
 
-		/* At the TOP, like the hint: the artwork's own caption (DONE) owns the bottom rows. */
-		calib_value_lbl = make_label(calib_root, &montserrat_40_digits, 0);
-		lv_label_set_text(calib_value_lbl, "");
-		lv_obj_align(calib_value_lbl, LV_ALIGN_TOP_MID, 0, 2);
-		lv_obj_add_flag(calib_value_lbl, LV_OBJ_FLAG_HIDDEN);
-
-		/* At the TOP: the artwork carries its own caption (WET/DRY/RESET) at the bottom of the
-		 * canvas, and a hint plate there would sit exactly on it. The top rows are empty. */
-		calib_hint_lbl = make_label(calib_root, &lv_font_montserrat_16, SCR_W);
+		calib_hint_lbl = make_label(calib_root, &montserrat_16_ui, SCR_W);
 		lv_label_set_text(calib_hint_lbl, "");
-		lv_obj_align(calib_hint_lbl, LV_ALIGN_TOP_MID, 0, 2);
+		lv_obj_align(calib_hint_lbl, LV_ALIGN_BOTTOM_MID, 0, -2);
 	}
 
 	/** Fill the calibration skeleton for one screen. */
-	void calib_fill(const lv_image_dsc_t *img, const char *hint, bool with_value)
+	void calib_fill(const lv_image_dsc_t *img, const char *hint)
 	{
 		lv_image_set_src(calib_img, img);
 		lv_label_set_text(calib_hint_lbl, hint ? hint : "");
 		set_hidden(calib_hint_lbl, hint == nullptr);
-		set_hidden(calib_value_lbl, !with_value);
 	}
 
 } // namespace
@@ -552,14 +563,21 @@ void ui::set_sensor(int32_t /*mv*/, int percent)
 	dirty = true;
 }
 
-void ui::set_low_battery(int percent)
+void ui::set_low_battery()
 {
 	if (!ready)
 	{
 		return;
 	}
-	pending_view = VIEW_LOWBAT;
+	pending_view = VIEW_LOWBAT; // static artwork; refresh() sees the view change
+}
 
+void ui::set_battery(int percent)
+{
+	if (!ready)
+	{
+		return;
+	}
 	if (percent < 0)
 	{
 		percent = 0;
@@ -568,17 +586,19 @@ void ui::set_low_battery(int percent)
 	{
 		percent = 100;
 	}
-	if (percent == last_lowbat_pct)
+	if (percent == last_batt_pct)
 	{
-		return; // same value already on the widgets
+		return; // same value already on the widget
 	}
 
 	char buf[8];
 	snprintf(buf, sizeof(buf), "%d%%", percent);
-	lv_label_set_text(lowbat_pct_lbl, buf);
+	lv_label_set_text(list_batt_lbl, buf);
+	lv_obj_align(list_batt_lbl, LV_ALIGN_TOP_RIGHT, -6, 2); // re-anchor: the text width changed
 
-	last_lowbat_pct = percent;
-	dirty = true;
+	last_batt_pct = percent;
+	/* Not dirtied: the label lives on the menu view alone, and a value that changed while the
+	 * menu was closed must not wake the panel. Entering the menu redraws anyway. */
 }
 
 void ui::set_error(const char *title, const char *detail)
@@ -671,7 +691,7 @@ void ui::set_calib_prompt(bool wet)
 		return;
 	}
 	pending_view = VIEW_CALIB_PROMPT;
-	calib_fill(wet ? &cal_wet : &cal_dry, "Hold=sample   Tap=back", false);
+	calib_fill(wet ? &cal_wet : &cal_dry, "Tap=back Hold=sample");
 	dirty = true;
 }
 
@@ -682,26 +702,18 @@ void ui::set_calib_reset_prompt()
 		return;
 	}
 	pending_view = VIEW_CALIB_RESET;
-	calib_fill(&cal_reset, "Hold=defaults   Tap=back", false);
+	calib_fill(&cal_reset, "Tap=back Hold=reset");
 	dirty = true;
 }
 
-void ui::set_calib_result(int32_t mv)
+void ui::set_calib_result()
 {
 	if (!ready)
 	{
 		return;
 	}
 	pending_view = VIEW_CALIB_RESULT;
-
-	calib_fill(&cal_done, nullptr, true);
-	if (mv != last_calib_mv)
-	{
-		char buf[16];
-		snprintf(buf, sizeof(buf), "%ld mV", (long)mv);
-		lv_label_set_text(calib_value_lbl, buf);
-		last_calib_mv = mv;
-	}
+	calib_fill(&cal_done, nullptr); // the checkmark is the whole message
 	dirty = true;
 }
 

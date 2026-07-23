@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Size: 40 px
  * Bpp: 1
- * Opts: --font C:/ncs/v3.4.0/modules/lib/gui/lvgl/scripts/built_in_font/Montserrat-Medium.ttf --size 40 --bpp 1 --format lvgl --symbols 0123456789% mV --lv-include lvgl.h -o montserrat_40_digits.c
+ * Opts: --font C:/ncs/v3.4.0/modules/lib/gui/lvgl/scripts/built_in_font/Montserrat-Medium.ttf --size 40 --bpp 1 --format lvgl --symbols 0123456789% mV --autohint-strong --lv-include lvgl.h -o src/fonts/montserrat_40_digits.c
  ******************************************************************************/
 
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE

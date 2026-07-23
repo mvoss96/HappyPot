@@ -254,7 +254,7 @@ namespace
 
 		go(State::CalResult);
 		idle_at = k_uptime_get() + RESULT_MS;
-		ui::set_calib_result(mv);
+		ui::set_calib_result();
 	}
 
 	void to_cal_reset_prompt()

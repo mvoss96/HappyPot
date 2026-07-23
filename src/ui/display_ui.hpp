@@ -51,8 +51,13 @@ namespace ui
 	 * displayed resolution, so a change too small to show costs no refresh. */
 	void set_sensor(int32_t mv, int percent);
 
-	/** The low-battery view (a resting view: up until the battery is not). */
-	void set_low_battery(int percent);
+	/** The low-battery view (a resting view: up until the battery is not). The artwork is the
+	 * whole message -- the exact percent lives in the menu, where someone checking up looks. */
+	void set_low_battery();
+
+	/** Battery percent readout in the menu's corner, for keeping an eye on the cell. Staged
+	 * from the loop's measurement; deduped on the shown value. */
+	void set_battery(int percent);
 
 	/** The error view: a headline and a detail line, both required. */
 	void set_error(const char *title, const char *detail);
@@ -74,8 +79,9 @@ namespace ui
 	/** The calibration-defaults confirmation. */
 	void set_calib_reset_prompt();
 
-	/** The captured endpoint, on its way into the store. */
-	void set_calib_result(int32_t mv);
+	/** The endpoint is captured and saved; the artwork says so. (The millivolts go to the
+	 * log -- a number nobody can act on does not belong on the panel.) */
+	void set_calib_result();
 
 	/** Commit every staged change with a single e-paper refresh: full on a view change and
 	 * periodically (ghosting), partial otherwise. Does nothing if nothing changed. */

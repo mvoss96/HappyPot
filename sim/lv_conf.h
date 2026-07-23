@@ -26,9 +26,9 @@
 /* The onboarding QR (ui::show_pairing). Matches conf/happypot_hw.conf on the device. */
 #define LV_USE_QRCODE 1
 
-// The two Montserrat faces display_ui.cpp uses, matching the device config.
-#define LV_FONT_MONTSERRAT_16 1
-#define LV_FONT_MONTSERRAT_40 1
-#define LV_FONT_DEFAULT &lv_font_montserrat_16
+// UI fonts are generated 1bpp subsets from src/fonts/ (compiled into the sim); only a
+// built-in default font is needed, which is never shown. Tiny UNSCII-8, matching the device.
+#define LV_FONT_UNSCII_8 1
+#define LV_FONT_DEFAULT &lv_font_unscii_8
 
 #endif // LV_CONF_H
